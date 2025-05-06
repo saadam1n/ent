@@ -1,0 +1,3 @@
+# Efficient Neural Tokenization (ENT)
+
+Here is our repo for our NeurIPS 2025 submission. We discuss efficient ways to tokenize the output for VLA models. We run tests on smaller BC transformer policies which can be seen as a LLM scaled down. Unlike normal BC transformer, we do not sample latent tokens and then assign a meaning to them later via a decoder that is learned simulatenously. We learn the decoder first, then assign tokens to sample afterwards. 
