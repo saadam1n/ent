@@ -108,6 +108,8 @@ class TransformerPolicy(nn.Module):
     """
     A BC transformer policy. Given some token IDs, it attempts to reconstruct those token IDs.
     Please note that our transformer policy assumes that tokens are selected ahead of time. 
+    Note that this policy has no concept of a "termination" token. 
+    It tries to predict whatever you give, while ignoring -1 tokens in gradient calculation.
     """
     def __init__(self, num_transformer_layers, num_attention_heads, context_length, embedding_dim, head_embedding_dim, num_embeddings):
         super(TransformerPolicy, self).__init__()
@@ -156,7 +158,7 @@ class TransformerPolicy(nn.Module):
     """
     def fetch_embeddings(self, token_ids):
         # we want to replace all padding indices
-        cleaned_token_ids = torch.where(token_ids != -1, token_ids, self.tokenizer.max_token_value)
+        cleaned_token_ids = torch.where(token_ids != -1, token_ids, 0)
         text_embedding = self.embedding_matrix(cleaned_token_ids) + self.positional_encoding.weight
         start_embedding = self.seq_start_token.weight.view(1, 1, -1).expand(text_embedding.shape[0], -1, -1)
 
