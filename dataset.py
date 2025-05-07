@@ -6,6 +6,7 @@ import numpy as np
 
 import random
 import os
+import bisect
 
 class BehaviorColoningDataset(torch.utils.data.Dataset):
     """
@@ -88,7 +89,8 @@ class BehaviorColoningDataset(torch.utils.data.Dataset):
             total_num_demos += current_num_demos
 
 
-        self.train_mode = False
+        self.train_mode = True
+        self.tokenization = True
 
         print(f"Total demo count is {total_num_demos}")
         print(f"\tTrain size is: {len(self.train_samples)}")
@@ -101,7 +103,7 @@ class BehaviorColoningDataset(torch.utils.data.Dataset):
         # ignore test for now because that will cause me a headache
 
         self.train_window_offsets = [
-            len(a) for a, _ in self.train_samples
+            len(a) - self.history_size for a, _ in self.train_samples
         ]
 
         for i in range(1, len(self.train_window_offsets)):
@@ -134,33 +136,34 @@ class BehaviorColoningDataset(torch.utils.data.Dataset):
         print(f"\tupper: {upper}")
         print(f"\twidth: {width}")
 
-        inv_width = 1.0 / width
+        inv_width = 2.0 / width
 
         for i in range(len(self.train_samples)):
-            self.train_samples[i][0].sub_(lower).mul_(inv_width)
+            self.train_samples[i][0].sub_(lower).mul_(inv_width).sub_(1.0)
 
         for i in range(len(self.test_samples)):
-            self.test_samples[i][0].sub_(lower).mul_(inv_width)
+            self.test_samples[i][0].sub_(lower).mul_(inv_width).sub_(1.0)
     
     def fetch_train_sample(self, idx):
-        lower = 0
-        upper = len(self.train_window_offsets)
+        demo_idx = bisect.bisect_right(self.train_window_offsets, idx)
 
-        while lower < upper:
-            mid = (lower + upper) / 2
+        prev_sum = self.train_window_offsets[demo_idx - 1] if demo_idx > 0 else 0
+        offset = idx - prev_sum
 
-            if self.train_window_count[mid] < idx:
-                lower = mid + 1
-            else:
-                upper = mid
-
-        # sample is at lower now
-        actual_offset = idx - self.train_window_count[lower]
-
-        traj = self.train_samples[lower][0][actual_offset:actual_offset + self.chunk_size + self.history_size]
+        traj = self.train_samples[demo_idx][0][offset:offset + self.chunk_size + self.history_size]
 
         pre = traj[:self.history_size]
-        tok = self.tokenizer.encode(traj[self.history_size:])
+        tok = traj[self.history_size:]
+
+        tok = self.tokenizer.encode(tok) if self.tokenization else tok
+
+        #print(f"Returning items of shape {pre.shape}\t{tok.shape}")
+
+        if tok.shape[0] == 0:
+            print(f"Huh... {self.train_samples[demo_idx][0].shape} {offset} {idx} {idx - prev_sum}")
+
+        pre = pre.to("cuda")
+        tok = tok.to("cuda")
 
         return pre, tok
     
