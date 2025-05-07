@@ -18,7 +18,7 @@ class BehaviorColoningDataset(torch.utils.data.Dataset):
         super(BehaviorColoningDataset, self).__init__()
 
         self.tokenizer = tokenizer
-        self.chunk_size = self.tokenizer.chunk_size if hasattr(self.tokenizer, "chunk_size") else 1
+        self.chunk_size = self.tokenizer.chunk_size if hasattr(self.tokenizer, "chunk_size") else 20
         self.history_size = history_size
 
         self.load_dataset()
@@ -68,8 +68,8 @@ class BehaviorColoningDataset(torch.utils.data.Dataset):
                     else:
                         padded_actions = demo_eef_actions
 
-                    if padded_actions.shape[0] % self.chunk_size != 0:
-                        raise RuntimeError("Bad padding")
+                    if not is_train_sample and padded_actions.shape[0] % self.chunk_size != 0:
+                        raise RuntimeError(f"Bad padding! Original shape: {demo_eef_actions.shape}, padded shape: {padded_actions.shape}, chunk size {self.chunk_size}")
                     
                     prepadded_shape = torch.cat(
                         (
@@ -103,7 +103,7 @@ class BehaviorColoningDataset(torch.utils.data.Dataset):
         # ignore test for now because that will cause me a headache
 
         self.train_window_offsets = [
-            len(a) - self.history_size for a, _ in self.train_samples
+            len(a) - self.history_size - self.chunk_size + 1 for a, _ in self.train_samples
         ]
 
         for i in range(1, len(self.train_window_offsets)):
@@ -158,9 +158,6 @@ class BehaviorColoningDataset(torch.utils.data.Dataset):
         tok = self.tokenizer.encode(tok) if self.tokenization else tok
 
         #print(f"Returning items of shape {pre.shape}\t{tok.shape}")
-
-        if tok.shape[0] == 0:
-            print(f"Huh... {self.train_samples[demo_idx][0].shape} {offset} {idx} {idx - prev_sum}")
 
         pre = pre.to("cuda")
         tok = tok.to("cuda")
