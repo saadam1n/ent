@@ -1,5 +1,5 @@
 import torch
-import tokenizers
+import trajtok
 
 import h5py
 import numpy as np
@@ -14,7 +14,7 @@ class BehaviorColoningDataset(torch.utils.data.Dataset):
     It allows for training, somehow. I have yet to figure that out.
     For now I will get the transformer to predict a single action chunk at a time.
     """
-    def __init__(self, tokenizer : tokenizers.GeneralTokenizer, history_size : int):
+    def __init__(self, tokenizer : trajtok.GeneralTokenizer, history_size : int):
         super(BehaviorColoningDataset, self).__init__()
 
         self.tokenizer = tokenizer

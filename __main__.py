@@ -6,12 +6,12 @@ from torch.utils.data.dataloader import DataLoader
 
 import policy
 import dataset
-import tokenizers
+import trajtok
 
 if not torch.cuda.is_available():
     raise RuntimeError("CUDA not available! Terminating...")
 
-bc_tokenizer = tokenizers.DefaultTokenizer()
+bc_tokenizer = trajtok.FastTokenizer()
 
 bc_dataset = dataset.BehaviorColoningDataset(
     # replace this line to change tokenizer
