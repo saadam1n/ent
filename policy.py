@@ -111,7 +111,7 @@ class TransformerPolicy(nn.Module):
     Note that this policy has no concept of a "termination" token. 
     It tries to predict whatever you give, while ignoring -1 tokens in gradient calculation.
     """
-    def __init__(self, num_transformer_layers, num_attention_heads, context_length, embedding_dim, head_embedding_dim, num_embeddings):
+    def __init__(self, num_transformer_layers, num_attention_heads, context_length, embedding_dim, head_embedding_dim, num_embeddings, action_dim, history_length):
         super(TransformerPolicy, self).__init__()
 
         self.num_transformer_layers = num_transformer_layers
@@ -120,6 +120,8 @@ class TransformerPolicy(nn.Module):
         self.embedding_dim = embedding_dim
         self.head_embedding_dim = head_embedding_dim
         self.num_embeddings = num_embeddings
+        self.action_dim = action_dim
+        self.history_length = history_length
 
         self.embedding_matrix = nn.Embedding(num_embeddings=self.num_embeddings, embedding_dim=self.embedding_dim)
         self.positional_encoding = nn.Embedding(num_embeddings=self.context_length, embedding_dim=self.embedding_dim)
@@ -136,15 +138,37 @@ class TransformerPolicy(nn.Module):
 
         self.temperature = 1.0
 
+        self.history_tokenizer = nn.Sequential(
+            nn.LayerNorm(self.history_length * self.action_dim),
+            nn.Linear(self.history_length * self.action_dim, self.history_length * self.embedding_dim)
+        )
+
     """
     Takes in Token IDs. If in evaluation mode, returns softmax probabilities of the next token. Otherwise, returns the cross-entropy loss.
     """
-    def forward(self, token_ids):
+    def forward(self, history, token_ids):
         N, _ = token_ids.shape
 
+        history_embeddings = checkpoint.checkpoint_sequential(
+            self.history_tokenizer, 
+            segments=1, 
+            input=history.flatten(1), 
+            use_reentrant=False
+        ).unflatten(
+            1, 
+            (self.history_length, self.embedding_dim)
+        )
+        
+
         token_embeddings = checkpoint.checkpoint(self.fetch_embeddings, token_ids, use_reentrant=False)
+
+        token_embeddings = torch.cat((history_embeddings, token_embeddings), dim=1)
+
         latent_next_tokens = checkpoint.checkpoint_sequential(self.transformer_layers, segments=self.num_transformer_layers // 2, input=token_embeddings, use_reentrant=False)
         
+        # discard predictions from first few tokens. they are useless
+        latent_next_tokens = latent_next_tokens[:, self.history_length:]
+
         model_output = None
         if self.training:
             model_output = checkpoint.checkpoint(self.calc_next_token_loss, latent_next_tokens, token_ids, use_reentrant=False)

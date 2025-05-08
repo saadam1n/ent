@@ -50,7 +50,7 @@ class BehaviorColoningDataset(torch.utils.data.Dataset):
                     demo_pos = f['data'][demo]['obs']['robot0_eef_pos'][:]
                     demo_rot = f['data'][demo]['obs']['robot0_eef_quat'][:]
 
-                    demo_eef_actions = torch.from_numpy(np.concatenate((demo_pos, demo_rot), axis=1))
+                    demo_eef_actions = torch.from_numpy(np.concatenate((demo_pos, demo_rot), axis=1)).float()
                     unpadded_size = demo_eef_actions.shape[0]
 
                     # for train: a window can start from any point in the trajectory

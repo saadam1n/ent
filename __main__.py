@@ -31,7 +31,9 @@ bc_transformer = policy.TransformerPolicy(
     context_length=140, 
     embedding_dim=512, 
     head_embedding_dim=64, 
-    num_embeddings=bc_tokenizer.token_count
+    num_embeddings=bc_tokenizer.token_count,
+    action_dim=7,
+    history_length=bc_dataset.history_size
 ).to("cuda")
 
 optimizer = torch.optim.Adam(bc_transformer.parameters(), lr=0.0001)
@@ -49,7 +51,7 @@ for epoch_idx in range(128):
 
         optimizer.zero_grad()
 
-        loss = bc_transformer(token_ids)
+        loss = bc_transformer(pre, token_ids)
         loss.backward()
         optimizer.step()
 
